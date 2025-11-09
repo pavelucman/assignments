@@ -125,3 +125,30 @@ make lint       # ruff passes
 ✓ All imports resolve correctly
 ✓ Repository pattern clearly separates storage from business logic
 ✓ Ready to implement gRPC handlers
+
+--
+
+## 2025-11-09 [TIME] — gRPC Service Implementation
+
+**Prompt (to Cursor):**
+"Create the service layer with business logic, gRPC handlers that map proto to domain models, and main server entry point."
+
+**AI Output (Cursor):**
+Generated 3 core files:
+1. app/service.py - PaymentService with idempotency logic
+2. transport/grpc_handler.py - gRPC servicer with error mapping
+3. server.py - Main server with graceful shutdown
+
+**Decision:**
+- Accepted idempotency check pattern: lookup before create
+- Modified error handling to use proper gRPC status codes (INVALID_ARGUMENT, NOT_FOUND, INTERNAL)
+- Added structured logging with request IDs for observability
+- Used environment variable for PORT configuration (12-factor app principle)
+- Implemented graceful shutdown with signal handlers
+- Changed import payments_pb2 as payments__pb2 to from . import payments_pb2 as payments__pb2
+
+
+✓ Server starts successfully
+✓ Logs show "Payment gRPC server listening on port 8080"
+✓ Health endpoint accessible
+✓ Ready to write tests
