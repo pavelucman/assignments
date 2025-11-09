@@ -95,3 +95,33 @@ Ran `make proto` successfully:
 ✓ payments_pb2_grpc.py generated  
 ✓ payments_pb2.pyi generated (type stubs)
 ✓ No errors during proto compilation
+
+--
+
+## — Domain Models and Business Logic
+
+**Prompt (to Cursor):**
+"Create domain models for Payment with validation logic and repository pattern for storage."
+
+**AI Output (Cursor):**
+Generated 4 files:
+1. domain/models.py - Payment dataclass with factory method
+2. domain/validators.py - Validation functions for amount, currency, idempotency_key
+3. storage/interface.py - Abstract PaymentRepository base class
+4. storage/memory.py - InMemoryPaymentRepository with thread-safe dict storage
+
+**Decision:**
+- Accepted Payment model structure with immutable fields
+- Modified currency validator to include more common currencies (USD, EUR, GBP, JPY, CAD, AUD)
+- Added thread safety to in-memory storage with threading.Lock
+- Used two separate dicts for O(1) lookup by both payment_id and idempotency_key
+
+**Verification:**
+```bash
+make typecheck  # mypy passes
+make lint       # ruff passes
+```
+✓ No type errors
+✓ All imports resolve correctly
+✓ Repository pattern clearly separates storage from business logic
+✓ Ready to implement gRPC handlers
