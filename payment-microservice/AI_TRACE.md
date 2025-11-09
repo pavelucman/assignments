@@ -50,3 +50,48 @@ Ran `ls -la` and confirmed all directories created:
 ✓ src/ with proper package structure
 ✓ tests/ folder ready
 ✓ Configuration files present
+
+---
+
+## — Makefile Creation for gRPC Proto Generation
+
+**Prompt:**
+"Create a Makefile for my Python gRPC project with targets for proto generation, install, lint, format, typecheck, test, run, docker-build, clean, and help."
+
+**AI Output (Cursor):**
+Generated comprehensive Makefile with 10 targets:
+
+1. `proto` - Generate Python code from proto/payments.proto using grpc_tools.protoc
+   - Includes --python_out, --grpc_python_out, and --mypy_out
+   - Output to src/payments_service/
+
+2. `install` - Install dependencies with pip install -e ".[dev]"
+
+3. `lint` - Run ruff check .
+
+4. `format` - Run ruff format .
+
+5. `typecheck` - Run mypy src/
+
+6. `test` - Run pytest with coverage (--cov=src --cov-report=term-missing)
+
+7. `run` - Run the server with python -m payments_service.server
+
+8. `docker-build` - Build Docker image tagged as payments-service:latest
+
+9. `clean` - Remove __pycache__, *.pyc, generated proto files, coverage reports
+
+10. `help` - Show available targets with descriptions (default target)
+
+**Decision:**
+- Reviewed the generated Makefile and accepted it as-is
+- Particularly liked the clean target's comprehensive cleanup
+- Appreciated the user-friendly help target with formatted output
+- Ran `make proto` to test proto file generation
+
+**Verification:**
+Ran `make proto` successfully:
+✓ payments_pb2.py generated
+✓ payments_pb2_grpc.py generated  
+✓ payments_pb2.pyi generated (type stubs)
+✓ No errors during proto compilation

@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package payments.v1;
+
+import "google/protobuf/timestamp.proto";
+
+service PaymentService {
+  // Creates a payment request. Must be idempotent by idempotency_key.
+  rpc RequestPayment(RequestPaymentRequest) returns (RequestPaymentResponse);
+
+  // Retrieves a single payment by its payment_id.
+  rpc GetPayment(GetPaymentRequest) returns (GetPaymentResponse);
+
+  // Lightweight health check.
+  rpc Health(HealthRequest) returns (HealthResponse);
+}
+
+message RequestPaymentRequest {
+  // Amount in minor units (e.g., cents). Must be > 0.
+  int64 amount_minor = 1;
+  // ISO 4217 (e.g., "USD", "EUR").
+  string currency = 2;
+  // Merchant order identifier (opaque string).
+  string order_id = 3;
+  // Required idempotency key. Same key + same payload returns the same result.
+  string idempotency_key = 4;
+  // Optional metadata for debugging/demo.
+  map<string, string> metadata = 5;
+}
+
+message RequestPaymentResponse {
+  string payment_id = 1; // server-generated
+  PaymentStatus status = 2;
+  string message = 3; // human-readable summary
+  string idempotency_key = 4; // echo back
+  google.protobuf.Timestamp created_at = 5;
+}
+
+enum PaymentStatus {
+  PAYMENT_STATUS_UNSPECIFIED = 0;
+  PAYMENT_STATUS_PENDING = 1;
+  PAYMENT_STATUS_SUCCEEDED = 2;
+  PAYMENT_STATUS_FAILED = 3;
+}
+
+message GetPaymentRequest { 
+  string payment_id = 1; 
+}
+
+message GetPaymentResponse {
+  string payment_id = 1;
+  PaymentStatus status = 2;
+  int64 amount_minor = 3;
+  string currency = 4;
+  string order_id = 5;
+  string idempotency_key = 6;
+  google.protobuf.Timestamp created_at = 7;
+  string message = 8;
+}
+
+message HealthRequest {}
+
+message HealthResponse { 
+  string status = 1; // e.g., "ok"
+}
