@@ -22,10 +22,12 @@ proto:
 	@echo "Generating Python code from proto files..."
 	python -m grpc_tools.protoc \
 		-I proto \
-		--python_out=src/payments_service \
-		--grpc_python_out=src/payments_service \
-		--mypy_out=src/payments_service \
+		--python_out=src \
+		--grpc_python_out=src \
+		--mypy_out=src \
 		proto/payments.proto
+	@echo "Fixing imports in generated files..."
+	@sed -i.bak 's/^import payments_pb2/from payments_service import payments_pb2/' src/payments_service/payments_pb2_grpc.py && rm -f src/payments_service/payments_pb2_grpc.py.bak || true
 	@echo "✓ Proto files generated successfully"
 
 # Install dependencies in development mode
@@ -80,8 +82,8 @@ clean:
 	find . -type d -name ".ruff_cache" -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name "htmlcov" -exec rm -rf {} + 2>/dev/null || true
 	rm -f .coverage
-	rm -f src/payments_service/*_pb2.py
-	rm -f src/payments_service/*_pb2.pyi
-	rm -f src/payments_service/*_pb2_grpc.py
+	rm -f src/payments_service/payments_pb2.py
+	rm -f src/payments_service/payments_pb2.pyi
+	rm -f src/payments_service/payments_pb2_grpc.py
 	@echo "✓ Cleanup completed"
 

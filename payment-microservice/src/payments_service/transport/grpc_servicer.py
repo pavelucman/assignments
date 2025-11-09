@@ -102,8 +102,12 @@ class PaymentServiceGrpcServicer(PaymentServiceServicer):
             )
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, error_msg)
 
+        except grpc.RpcError:
+            # Re-raise gRPC errors (from context.abort) without catching them
+            raise
+
         except Exception as e:
-            # Unexpected errors
+            # Unexpected errors only
             logger.error(
                 f"RequestPayment RPC failed with unexpected error: {e}",
                 extra={"idempotency_key": request.idempotency_key},
@@ -141,26 +145,8 @@ class PaymentServiceGrpcServicer(PaymentServiceServicer):
             # Call business logic
             payment = self._service.get_payment(request.payment_id)
 
-            if payment is None:
-                error_msg = f"Payment not found: {request.payment_id}"
-                logger.info(error_msg)
-                context.abort(grpc.StatusCode.NOT_FOUND, error_msg)
-
-            # Convert to protobuf response
-            response = self._payment_to_get_payment_response(payment)
-
-            logger.info(
-                "GetPayment RPC completed successfully",
-                extra={
-                    "payment_id": payment.payment_id,
-                    "status": payment.status.value,
-                },
-            )
-
-            return response
-
         except Exception as e:
-            # Unexpected errors (excluding the abort above)
+            # Unexpected errors from service layer
             logger.error(
                 f"GetPayment RPC failed with unexpected error: {e}",
                 extra={"payment_id": request.payment_id},
@@ -170,6 +156,25 @@ class PaymentServiceGrpcServicer(PaymentServiceServicer):
                 grpc.StatusCode.INTERNAL,
                 "Internal error retrieving payment",
             )
+
+        # Check if payment was found (do this outside try-except to avoid catching abort exception)
+        if payment is None:
+            error_msg = f"Payment not found: {request.payment_id}"
+            logger.info(error_msg)
+            context.abort(grpc.StatusCode.NOT_FOUND, error_msg)
+
+        # Convert to protobuf response
+        response = self._payment_to_get_payment_response(payment)
+
+        logger.info(
+            "GetPayment RPC completed successfully",
+            extra={
+                "payment_id": payment.payment_id,
+                "status": payment.status.value,
+            },
+        )
+
+        return response
 
     def Health(
         self, request: Any, context: grpc.ServicerContext

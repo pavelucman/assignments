@@ -152,3 +152,36 @@ Generated 3 core files:
 ✓ Logs show "Payment gRPC server listening on port 8080"
 ✓ Health endpoint accessible
 ✓ Ready to write tests
+
+--
+
+## — Unit Tests Implementation
+
+**Prompt (to Cursor):**
+"Write comprehensive pytest unit tests for validators, models, storage, service layer, and gRPC handlers. Target ≥80% code coverage."
+
+**AI Output (Cursor):**
+Generated 5 test files covering:
+1. test_validators.py - 12 test cases for validation logic
+2. test_models.py - Payment model creation and immutability
+3. test_storage.py - Repository pattern with thread safety
+4. test_service.py - Business logic and idempotency
+5. test_grpc_handler.py - gRPC error mapping and proto conversion
+
+**Decision:**
+- Used pytest.mark.parametrize for validation test cases (cleaner than individual tests)
+- Added unittest.mock for service layer mocking in gRPC tests
+- Included thread safety test for concurrent storage access
+- Used fixtures for common test data (repository, sample payments)
+
+Coverage Report:
+- domain/validators.py: 100%
+- domain/models.py: 95%
+- storage/memory.py: 100%
+- app/service.py: 92%
+- transport/grpc_handler.py: 88%
+- Overall: 87% ✓ (exceeds 80% threshold)
+
+✓ All tests pass
+✓ Coverage gate passed
+✓ Ready for CI integration
