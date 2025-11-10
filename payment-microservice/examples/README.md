@@ -20,7 +20,7 @@ The `client_example.py` demonstrates all the key features of the payment service
 In one terminal:
 
 ```bash
-cd /Users/pavelucman/Downloads/assignments/payment-microservice
+cd /assignments/payment-microservice
 
 # Install dependencies if not already done
 make install
@@ -43,7 +43,7 @@ Server is ready to accept requests
 In another terminal:
 
 ```bash
-cd /Users/pavelucman/Downloads/assignments/payment-microservice
+cd /assignments/payment-microservice
 
 # Run the example client
 python examples/client_example.py
