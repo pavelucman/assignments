@@ -1,0 +1,270 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+  # ===========================================================================
+  # Job 1: Lint - Check code quality and formatting
+  # ===========================================================================
+  lint:
+    name: Lint Code (Ruff)
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-lint-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-lint-
+            ${{ runner.os }}-pip-
+
+      - name: Install Ruff
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+
+      - name: Run Ruff linter
+        run: ruff check .
+
+      - name: Run Ruff formatter check
+        run: ruff format --check .
+
+  # ===========================================================================
+  # Job 2: Type Check - Verify type hints with mypy
+  # ===========================================================================
+  typecheck:
+    name: Type Check (Mypy)
+    runs-on: ubuntu-latest
+    needs: lint
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-typecheck-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-typecheck-
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Generate gRPC code from proto files
+        run: |
+          python -m grpc_tools.protoc \
+            -I proto \
+            --python_out=src \
+            --grpc_python_out=src \
+            --mypy_out=src \
+            proto/payments.proto
+          sed -i 's/^import payments_pb2/from payments_service import payments_pb2/' src/payments_service/payments_pb2_grpc.py
+
+      - name: Run mypy type checker
+        run: mypy src/
+
+  # ===========================================================================
+  # Job 3: Test - Run unit and integration tests with coverage
+  # ===========================================================================
+  test:
+    name: Test (Pytest + Coverage)
+    runs-on: ubuntu-latest
+    needs: typecheck
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-test-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-test-
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Generate gRPC code from proto files
+        run: |
+          python -m grpc_tools.protoc \
+            -I proto \
+            --python_out=src \
+            --grpc_python_out=src \
+            --mypy_out=src \
+            proto/payments.proto
+          sed -i 's/^import payments_pb2/from payments_service import payments_pb2/' src/payments_service/payments_pb2_grpc.py
+
+      - name: Run tests with coverage
+        run: |
+          pytest --cov=src --cov-report=term-missing --cov-report=xml --cov-report=html --cov-fail-under=80
+
+      - name: Upload coverage report (HTML)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report-html
+          path: htmlcov/
+          retention-days: 30
+
+      - name: Upload coverage report (XML)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report-xml
+          path: coverage.xml
+          retention-days: 30
+
+      - name: Comment coverage on PR
+        uses: py-cov-action/python-coverage-comment-action@v3
+        if: github.event_name == 'pull_request'
+        with:
+          GITHUB_TOKEN: ${{ github.token }}
+          MINIMUM_GREEN: 90
+          MINIMUM_ORANGE: 80
+
+  # ===========================================================================
+  # Job 4: Build - Build and test Docker image
+  # ===========================================================================
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          load: true
+          tags: payments-service:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test Docker image - Start container
+        run: |
+          docker run -d --name payment-service-test -p 7000:7000 payments-service:test
+          echo "Container started, waiting for health check..."
+
+      - name: Wait for container to be healthy
+        run: |
+          timeout 60 bash -c '
+            until docker inspect --format="{{.State.Health.Status}}" payment-service-test | grep -q "healthy"; do
+              echo "Waiting for container to be healthy..."
+              sleep 2
+            done
+          '
+          echo "✓ Container is healthy!"
+
+      - name: Check container logs
+        if: always()
+        run: docker logs payment-service-test
+
+      - name: Test gRPC endpoint connectivity
+        run: |
+          docker exec payment-service-test python -c "
+          import socket
+          import sys
+          try:
+              s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+              s.settimeout(5)
+              s.connect(('localhost', 7000))
+              s.close()
+              print('✓ gRPC endpoint is accessible')
+              sys.exit(0)
+          except Exception as e:
+              print(f'✗ Failed to connect: {e}')
+              sys.exit(1)
+          "
+
+      - name: Stop and remove test container
+        if: always()
+        run: docker rm -f payment-service-test || true
+
+      - name: Export Docker image as artifact
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        run: |
+          docker save payments-service:test | gzip > payments-service-image.tar.gz
+
+      - name: Upload Docker image artifact
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: payments-service-image.tar.gz
+          retention-days: 7
+
+  # ===========================================================================
+  # Summary Job - Report overall status
+  # ===========================================================================
+  summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, test, build]
+    if: always()
+    
+    steps:
+      - name: Check job statuses
+        run: |
+          echo "## CI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Lint | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Type Check | ${{ needs.typecheck.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Test | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Fail if any job failed
+        if: |
+          needs.lint.result == 'failure' ||
+          needs.typecheck.result == 'failure' ||
+          needs.test.result == 'failure' ||
+          needs.build.result == 'failure'
+        run: exit 1
+

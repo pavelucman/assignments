@@ -177,11 +177,26 @@ def run_client_example(host: str = "localhost", port: int = 7000) -> None:
 
 
 if __name__ == "__main__":
+    import os
     import sys
 
-    # Get host and port from command line if provided
-    host = sys.argv[1] if len(sys.argv) > 1 else "localhost"
-    port = int(sys.argv[2]) if len(sys.argv) > 2 else 7000
+    # Get server address from environment variable or command line
+    # Priority: Command line > Environment variable > Default
+    grpc_server = os.getenv("GRPC_SERVER", "localhost:7000")
+    
+    if len(sys.argv) > 1:
+        # Command line arguments take precedence
+        host = sys.argv[1]
+        port = int(sys.argv[2]) if len(sys.argv) > 2 else 7000
+    else:
+        # Parse from environment variable
+        if ":" in grpc_server:
+            host, port_str = grpc_server.split(":", 1)
+            port = int(port_str)
+        else:
+            host = grpc_server
+            port = 7000
 
+    logger.info(f"Connecting to gRPC server at {host}:{port}")
     run_client_example(host, port)
 

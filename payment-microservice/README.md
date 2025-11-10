@@ -1,5 +1,10 @@
 # Payment Microservice
 
+[![CI](https://github.com/YOUR_USERNAME/payment-microservice/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/payment-microservice/actions/workflows/ci.yml)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A Python gRPC payment microservice with idempotency support, validation, and comprehensive testing.
 
 ## Features
@@ -79,6 +84,118 @@ MAX_WORKERS=20 python -m payments_service.server
 
 # Both
 PORT=9090 MAX_WORKERS=20 python -m payments_service.server
+```
+
+## Docker Deployment
+
+### Building the Docker Image
+
+```bash
+# Build the image
+make docker-build
+
+# Or manually
+docker build -t payments-service:latest .
+```
+
+The Dockerfile uses multi-stage builds for:
+- ✅ Minimal image size (~150MB)
+- ✅ Security (runs as non-root user)
+- ✅ Optimized layer caching
+- ✅ Built-in health checks
+
+### Running with Docker
+
+```bash
+# Run in foreground (logs to stdout)
+make docker-run
+
+# Run in background
+make docker-run-bg
+
+# Stop the container
+make docker-stop
+
+# View logs
+docker logs -f payment-service
+```
+
+### Docker Configuration
+
+Pass environment variables to the container:
+
+```bash
+# Custom port
+docker run --rm -p 8080:8080 -e PORT=8080 payments-service:latest
+
+# Custom worker threads
+docker run --rm -p 7000:7000 -e MAX_WORKERS=20 payments-service:latest
+
+# Both
+docker run --rm -p 9000:9000 \
+  -e PORT=9000 \
+  -e MAX_WORKERS=20 \
+  payments-service:latest
+```
+
+### Health Check
+
+The Docker container includes a built-in health check that runs every 30 seconds:
+
+```bash
+# Check container health
+docker inspect --format='{{.State.Health.Status}}' payment-service
+
+# View health check logs
+docker inspect --format='{{json .State.Health}}' payment-service | python -m json.tool
+```
+
+### Docker Compose (Recommended for Local Development)
+
+**Basic Usage:**
+
+```bash
+# Start service in background
+docker-compose up -d
+
+# View logs
+docker-compose logs -f payment-service
+
+# Stop service
+docker-compose down
+
+# Rebuild and restart
+docker-compose up -d --build
+```
+
+**Run with Test Client:**
+
+The Docker Compose setup includes an optional test client service that demonstrates the payment service functionality:
+
+```bash
+# Start server and run test client
+docker-compose --profile test up
+
+# Or run test client against running server
+docker-compose run --rm test-client
+
+# View test client logs
+docker-compose logs test-client
+```
+
+**Environment Variables:**
+
+You can override environment variables in a `.env` file:
+
+```bash
+# Create .env file
+cat > .env << EOF
+PORT=8080
+MAX_WORKERS=20
+EOF
+
+# Start with custom configuration
+docker-compose up -d
 ```
 
 ### Server Output

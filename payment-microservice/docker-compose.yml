@@ -1,0 +1,58 @@
+services:
+  # ============================================================================
+  # Payment Service - Main gRPC Server
+  # ============================================================================
+  payment-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: payments-service:latest
+    container_name: payment-service
+    ports:
+      - "7000:7000"
+    environment:
+      - PORT=7000
+      - MAX_WORKERS=10
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s = socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.settimeout(2); s.connect(('localhost', 7000)); s.close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    networks:
+      - payment-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ============================================================================
+  # Test Client - Optional service to test the payment server
+  # ============================================================================
+  test-client:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+      target: test-client
+    image: payments-service-test:latest
+    container_name: payment-test-client
+    depends_on:
+      payment-service:
+        condition: service_healthy
+    environment:
+      - GRPC_SERVER=payment-service:7000
+      - PYTHONUNBUFFERED=1
+    networks:
+      - payment-network
+    # Run once and exit (for testing)
+    restart: "no"
+    profiles:
+      - test
+    command: ["python", "examples/client_example.py"]
+
+networks:
+  payment-network:
+    driver: bridge

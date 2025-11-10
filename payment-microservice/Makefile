@@ -1,20 +1,23 @@
-.PHONY: help proto install lint format typecheck test run docker-build clean
+.PHONY: help proto install lint format typecheck test run docker-build docker-run docker-stop docker-run-bg clean
 
 # Default target
 help:
 	@echo "Payment Microservice - Available Make Targets"
 	@echo "=============================================="
 	@echo ""
-	@echo "  make proto         - Generate Python code from proto files"
-	@echo "  make install       - Install dependencies (dev mode)"
-	@echo "  make lint          - Run ruff linter"
-	@echo "  make format        - Format code with ruff"
-	@echo "  make typecheck     - Run mypy type checker"
-	@echo "  make test          - Run tests with coverage"
-	@echo "  make run           - Run the payment service"
-	@echo "  make docker-build  - Build Docker image"
-	@echo "  make clean         - Remove generated files and caches"
-	@echo "  make help          - Show this help message"
+	@echo "  make proto          - Generate Python code from proto files"
+	@echo "  make install        - Install dependencies (dev mode)"
+	@echo "  make lint           - Run ruff linter"
+	@echo "  make format         - Format code with ruff"
+	@echo "  make typecheck      - Run mypy type checker"
+	@echo "  make test           - Run tests with coverage"
+	@echo "  make run            - Run the payment service locally"
+	@echo "  make docker-build   - Build Docker image"
+	@echo "  make docker-run     - Run Docker container (foreground)"
+	@echo "  make docker-run-bg  - Run Docker container (background)"
+	@echo "  make docker-stop    - Stop running Docker container"
+	@echo "  make clean          - Remove generated files and caches"
+	@echo "  make help           - Show this help message"
 	@echo ""
 
 # Generate Python code from proto files
@@ -66,8 +69,24 @@ run:
 # Build Docker image
 docker-build:
 	@echo "Building Docker image..."
-	docker build -t payments-service:latest .
+	docker build -t payments-service:latest -t payments-service:0.1.0 .
 	@echo "✓ Docker image built successfully"
+
+# Run Docker container
+docker-run:
+	@echo "Running Docker container..."
+	docker run --rm -p 7000:7000 --name payment-service payments-service:latest
+
+# Stop Docker container
+docker-stop:
+	@echo "Stopping Docker container..."
+	docker stop payment-service || true
+
+# Run Docker container in background
+docker-run-bg:
+	@echo "Running Docker container in background..."
+	docker run -d -p 7000:7000 --name payment-service payments-service:latest
+	@echo "✓ Container started. View logs with: docker logs -f payment-service"
 
 # Clean generated files and caches
 clean:

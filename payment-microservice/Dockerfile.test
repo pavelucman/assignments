@@ -1,0 +1,44 @@
+# Dockerfile for test client
+# Used by docker-compose to run integration tests
+
+FROM python:3.12-slim AS test-client
+
+WORKDIR /app
+
+# Install dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy and install dependencies
+COPY pyproject.toml .
+RUN python -m venv /app/venv && \
+    /app/venv/bin/pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    /app/venv/bin/pip install --no-cache-dir -e ".[dev]"
+
+# Copy proto files
+COPY proto/ proto/
+
+# Copy source code and examples
+COPY src/ src/
+COPY examples/ examples/
+
+# Generate gRPC code and move to correct location
+RUN /app/venv/bin/python -m grpc_tools.protoc \
+    -I proto \
+    --python_out=. \
+    --grpc_python_out=. \
+    proto/payments.proto && \
+    # Move generated files to payments_service package \
+    mv payments_pb2.py src/payments_service/ && \
+    mv payments_pb2_grpc.py src/payments_service/ && \
+    # Fix imports in generated gRPC file \
+    sed -i 's/^import payments_pb2/from payments_service import payments_pb2/' src/payments_service/payments_pb2_grpc.py || true
+
+ENV PATH="/app/venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app/src
+
+# Default command (can be overridden)
+CMD ["python", "examples/client_example.py"]
+

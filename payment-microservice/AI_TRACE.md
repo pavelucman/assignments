@@ -185,3 +185,86 @@ Coverage Report:
 ✓ All tests pass
 ✓ Coverage gate passed
 ✓ Ready for CI integration
+
+--
+
+## 2025-11-09 [TIME] — Docker and CI Pipeline Setup
+
+**Prompt (to Cursor):**
+"Create production-ready Docker setup with multi-stage build and GitHub Actions CI pipeline with lint, typecheck, test, and build stages."
+
+**AI Output (Cursor):**
+Generated:
+1. Multi-stage Dockerfile (builder + runtime, ~150MB final image)
+2. .dockerignore to exclude unnecessary files
+3. docker-compose.yml for easy local development
+4. GitHub Actions workflow with 4 jobs: lint → typecheck → test → build
+
+**Decision:**
+- Used python:3.12-slim for smaller image size
+- Added non-root user in Docker for security
+- Implemented coverage gate (80%) in CI test job
+- Added dependency caching in GitHub Actions to speed up builds
+- Included healthcheck in Docker container
+
+**Verification:**
+```bash
+# Local Docker test
+docker build -t payments-service:latest .
+docker run -p 8080:8080 payments-service:latest
+python scripts/test_client.py  # ✓ Works
+
+# Check image size
+docker images | grep payments-service
+# ~150MB (optimized)
+
+# Push to trigger CI
+git push
+```
+✓ Docker image builds successfully
+✓ Container runs and serves requests
+✓ GitHub Actions CI pipeline configured
+✓ All checks will run on push
+
+**Workflow Visualization**
+┌─────────────────────────────────────────────────────────┐
+│                     Trigger Event                        │
+│         (push or pull_request to main/master)           │
+└───────────────────┬─────────────────────────────────────┘
+                    │
+                    ▼
+┌───────────────────────────────────────────────────────┐
+│  Job 1: Lint (Ruff)                                   │
+│  • Check code quality                                 │
+│  • Verify formatting                                  │
+└─────────────────┬─────────────────────────────────────┘
+                  │ (needs: none)
+                  ▼
+┌───────────────────────────────────────────────────────┐
+│  Job 2: Type Check (Mypy)                            │
+│  • Generate proto files                               │
+│  • Run type checker                                   │
+└─────────────────┬─────────────────────────────────────┘
+                  │ (needs: lint)
+                  ▼
+┌───────────────────────────────────────────────────────┐
+│  Job 3: Test (Pytest)                                │
+│  • Run unit + integration tests                       │
+│  • Enforce 80% coverage                               │
+│  • Upload coverage artifacts                          │
+└─────────────────┬─────────────────────────────────────┘
+                  │ (needs: typecheck)
+                  ▼
+┌───────────────────────────────────────────────────────┐
+│  Job 4: Build (Docker)                               │
+│  • Build Docker image                                 │
+│  • Test container health                              │
+│  • Export image (main/master only)                    │
+└─────────────────┬─────────────────────────────────────┘
+                  │ (needs: test)
+                  ▼
+┌───────────────────────────────────────────────────────┐
+│  Job 5: Summary                                       │
+│  • Report overall status                              │
+│  • Fail if any job failed                             │
+└───────────────────────────────────────────────────────┘
